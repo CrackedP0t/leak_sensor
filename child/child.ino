@@ -11,10 +11,13 @@
     The slave devices will receive the broadcasted messages and print them to the Serial Monitor.
 */
 
+#include <DHT22.h>
 #include "ESP32_NOW.h"
 #include "WiFi.h"
 
 #include <esp_mac.h>  // For the MAC2STR and MACSTR macros
+
+DHT22 dht22(25); 
 
 /* Definitions */
 
@@ -88,11 +91,24 @@ void setup() {
     delay(5000);
     ESP.restart();
   }
+  
+  Serial.println(dht22.debug());
 
   Serial.println("Setup complete. Broadcasting messages every 5 seconds.");
 }
 
 void loop() {
+  float t = dht22.getTemperature();
+  float h = dht22.getHumidity();
+
+  if (dht22.getLastError() != dht22.OK) {
+    Serial.print("last error :");
+    Serial.println(dht22.getLastError());
+  }
+
+  Serial.print("h=");Serial.print(h,1);Serial.print("\t");
+  Serial.print("t=");Serial.println(t,1);
+
   // Broadcast a message to all devices within the network
   char data[32];
   snprintf(data, sizeof(data), "Hello, World! #%lu", msg_count++);
@@ -103,5 +119,5 @@ void loop() {
     Serial.println("Failed to broadcast message");
   }
 
-  delay(5000);
+  delay(500);
 }
