@@ -11,9 +11,11 @@
     The slave devices will receive the broadcasted messages and print them to the Serial Monitor.
 */
 
+#include <ArduinoJson.h>
 #include <DHT22.h>
 #include "ESP32_NOW.h"
 #include "WiFi.h"
+
 
 #include <esp_mac.h>  // For the MAC2STR and MACSTR macros
 
@@ -106,18 +108,26 @@ void loop() {
     Serial.println(dht22.getLastError());
   }
 
-  Serial.print("h=");Serial.print(h,1);Serial.print("\t");
-  Serial.print("t=");Serial.println(t,1);
+  JsonDocument doc;
+
+  doc["r"] = "ok";
+  doc["h"] = h;
+  doc["t"] = t;
+
+  serializeJson(doc, Serial);
+
+  Serial.print("h:");Serial.print(h,1);Serial.print(",");
+  Serial.print("t:");Serial.println(t,1);
 
   // Broadcast a message to all devices within the network
   char data[32];
   snprintf(data, sizeof(data), "Hello, World! #%lu", msg_count++);
 
-  Serial.printf("Broadcasting message: %s\n", data);
+  // Serial.printf("Broadcasting message: %s\n", data);
 
   if (!broadcast_peer.send_message((uint8_t *)data, sizeof(data))) {
     Serial.println("Failed to broadcast message");
   }
 
-  delay(500);
+  delay(1000);
 }
