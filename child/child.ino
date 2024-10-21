@@ -107,7 +107,7 @@ void loop() {
   doc["mac"] = WiFi.macAddress();
 
   if (dht22.getLastError() != dht22.OK) {
-    e = dht22.getLastError();
+    auto e = dht22.getLastError();
     Serial.print("last error :");
     Serial.println(e);
 
