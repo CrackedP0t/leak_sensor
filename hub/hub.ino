@@ -6,18 +6,20 @@
 *********/
 #include <ESP32_NOW.h>
 #include <WiFi.h>
+#include <ArduinoJson.h>
 
 #define ESPNOW_WIFI_CHANNEL 6
 
 // callback function that will be executed when data is received
 void OnDataRecv(const uint8_t * mac_addr, const uint8_t *incomingData, int len) {
-  char macStr[18];
-  Serial.print("Packet received from: ");
-  snprintf(macStr, sizeof(macStr), "%02x:%02x:%02x:%02x:%02x:%02x",
-           mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
-  Serial.println(macStr);
-  Serial.write(incomingData, len);
-  Serial.println();
+  JsonDocument doc;
+  deserializeJson(doc, incomingData, len);
+  int id = doc["i"];
+  float humidity = doc["h"];
+  Serial.print("h");
+  Serial.print(id);
+  Serial.print(":");
+  Serial.println(humidity);
 }
  
 void setup() {
