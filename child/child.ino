@@ -15,55 +15,24 @@
 #include <DHT22.h>
 #include "ESP32_NOW.h"
 #include "WiFi.h"
-
-
 #include <esp_mac.h>  // For the MAC2STR and MACSTR macros
 
-DHT22 dht22(25); 
-
-/* Definitions */
+uint8_t broadcastAddress[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
 #define ESPNOW_WIFI_CHANNEL 6
 
-/* Classes */
+#define CHILD_ID 1
 
-// Creating a new class that inherits from the ESP_NOW_Peer class is required.
-
-class ESP_NOW_Broadcast_Peer : public ESP_NOW_Peer {
-public:
-  // Constructor of the class using the broadcast address
-  ESP_NOW_Broadcast_Peer(uint8_t channel, wifi_interface_t iface, const uint8_t *lmk) : ESP_NOW_Peer(ESP_NOW.BROADCAST_ADDR, channel, iface, lmk) {}
-
-  // Destructor of the class
-  ~ESP_NOW_Broadcast_Peer() {
-    remove();
-  }
-
-  // Function to properly initialize the ESP-NOW and register the broadcast peer
-  bool begin() {
-    if (!ESP_NOW.begin() || !add()) {
-      log_e("Failed to initialize ESP-NOW or register the broadcast peer");
-      return false;
-    }
-    return true;
-  }
-
-  // Function to send a message to all devices within the network
-  bool send_message(const uint8_t *data, size_t len) {
-    if (!send(data, len)) {
-      log_e("Failed to broadcast message");
-      return false;
-    }
-    return true;
-  }
-};
+void data_sent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  Serial.print("Last Send Status:\t");
+  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+}
 
 /* Global Variables */
 
 uint32_t msg_count = 0;
 
-// Create a broadcast peer object
-ESP_NOW_Broadcast_Peer broadcast_peer(ESPNOW_WIFI_CHANNEL, WIFI_IF_STA, NULL);
+DHT22 dht22(25); 
 
 /* Main */
 
@@ -80,20 +49,32 @@ void setup() {
     delay(100);
   }
 
-  Serial.println("ESP-NOW Example - Broadcast Master");
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("Error initializing ESP-NOW");
+    return;
+  }
+  
+  esp_now_register_send_cb(data_sent);
+
+  esp_now_peer_info_t peerInfo = {};
+  memcpy(peerInfo.peer_addr, broadcastAddress, 6);
+  peerInfo.channel = ESPNOW_WIFI_CHANNEL;  
+  peerInfo.encrypt = false;
+         
+  if (esp_now_add_peer(&peerInfo) != ESP_OK){
+    Serial.println("Failed to add peer");
+    Serial.println("Rebooting in 5 seconds...");
+    delay(5000);
+    ESP.restart();
+  }
+
+  Serial.print("Child sensor ");
+  Serial.println(CHILD_ID);
   Serial.println("Wi-Fi parameters:");
   Serial.println("  Mode: STA");
   Serial.println("  MAC Address: " + WiFi.macAddress());
   Serial.printf("  Channel: %d\n", ESPNOW_WIFI_CHANNEL);
 
-  // Register the broadcast peer
-  if (!broadcast_peer.begin()) {
-    Serial.println("Failed to initialize broadcast peer");
-    Serial.println("Reebooting in 5 seconds...");
-    delay(5000);
-    ESP.restart();
-  }
-  
   Serial.println(dht22.debug());
 
   Serial.println("Setup complete. Broadcasting messages every 5 seconds.");
@@ -104,7 +85,8 @@ void loop() {
   float h = dht22.getHumidity();
 
   JsonDocument doc;
-  doc["mac"] = WiFi.macAddress();
+  doc["m"] = WiFi.macAddress();
+  doc["i"] = CHILD_ID;
 
   if (dht22.getLastError() != dht22.OK) {
     auto e = dht22.getLastError();
@@ -120,13 +102,16 @@ void loop() {
   }
 
   // Broadcast a message to all devices within the network
-  char data[255];
+  char message[255];
   
-  serializeJson(doc, data, sizeof data);
+  size_t msg_len = serializeJson(doc, message, sizeof message);
 
-  Serial.println(data);
+  Serial.write(message, msg_len);
+  Serial.println();
 
-  if (!broadcast_peer.send_message((uint8_t *)data, sizeof(data))) {
+  esp_err_t outcome = esp_now_send(broadcastAddress, (uint8_t *) &message, msg_len);
+
+  if (outcome != ESP_OK) {
     Serial.println("Failed to broadcast message");
   }
 
