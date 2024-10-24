@@ -23,6 +23,8 @@ uint8_t broadcastAddress[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
 #define CHILD_ID 1
 
+#define TOUCH_PIN 33
+
 void data_sent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   Serial.print("Last Send Status:\t");
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
@@ -83,10 +85,12 @@ void setup() {
 void loop() {
   float t = dht22.getTemperature();
   float h = dht22.getHumidity();
+  touch_value_t c = touchRead(TOUCH_PIN);
 
   JsonDocument doc;
   doc["m"] = WiFi.macAddress();
   doc["i"] = CHILD_ID;
+  doc["c"] = c;
 
   if (dht22.getLastError() != dht22.OK) {
     auto e = dht22.getLastError();
